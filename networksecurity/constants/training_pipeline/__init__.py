@@ -2,7 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-
+from datetime import datetime
 
 # Data ingestion variables
 DATA_INGESTION_COLLECTION_NAME: str = "NETWORK_COLLECTION"
@@ -20,3 +20,12 @@ FILE_NAME: str = "phisingData.csv"
 
 TRAIN_FILE_NAME: str = "train.csv"
 TEST_FILE_NAME: str = "test.csv"
+
+
+# Data validation variables
+DATA_VALIDATION_DIRECTORY_NAME: str = "data_validation"
+DATA_VALIDATION_VALID_DIRECTORY: str = "validated"
+DATA_VALIDATION_INVALID_DIRECTORY: str = "invalid"
+DATA_VALIDATION_DRIFT_REPORT_DIRECTORY: str = "drift_report"
+DATA_VALIDATION_DRIFT_REPORT_FILE_NAME: str = f"report_{datetime.now().strftime('%m_%d_%Y_%H_%M_%S')}.html"
+PREPROCESSING_OBJECT_FILE_NAME = "preprocessing.pkl"
