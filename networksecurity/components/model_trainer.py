@@ -17,6 +17,9 @@ from sklearn.neighbors import KNeighborsClassifier
 
 import mlflow
 
+import dagshub
+dagshub.init(repo_owner='kunalsrivastav721', repo_name='network_security_MLOps', mlflow=True)
+
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig, data_transformation_artifact: DataTransformationArtifact):
@@ -27,7 +30,7 @@ class ModelTrainer:
             raise NetworkSecurityException(e, sys)
         
     
-    def track_mlflow(self, best_model, classification_metric: ClassificationMetricArtifact):
+    def track_mlflow(self, best_model, classification_metric: ClassificationMetricArtifact, model_name):
         
         with mlflow.start_run():
             f1_score = classification_metric.f1_score
@@ -38,7 +41,9 @@ class ModelTrainer:
             mlflow.log_metric("precision_score", precision_score)
             mlflow.log_metric("recall_score", recall_score)
 
-            mlflow.sklearn.log_model(best_model, "model")
+            mlflow.log_param("Model Name", model_name)
+
+            mlflow.sklearn.log_model(best_model, f"model_{model_name}")
 
         
     def train_model(self, X_train, y_train, X_test, y_test):
@@ -59,9 +64,9 @@ class ModelTrainer:
                 # 'max_features':['sqrt','log2'],
             },
             "Random Forest":{
-                'criterion':['gini', 'entropy', 'log_loss'],     
+                # 'criterion':['gini', 'entropy', 'log_loss'],     
                 # 'max_features':['sqrt','log2',None],
-                'n_estimators': [8,16,32,128,256]
+                'n_estimators': [8,16,32,64]
             },
             "Gradient Boosting":{
                 'loss':['log_loss', 'exponential'],
@@ -69,12 +74,12 @@ class ModelTrainer:
                 # 'subsample':[0.6,0.7,0.75,0.85,0.9],
                 # 'criterion':['squared_error', 'friedman_mse'],
                 # 'max_features':['auto','sqrt','log2'],
-                'n_estimators': [8,16,32,64,128,256]
+                'n_estimators': [8,16,32,128]
             },
             "Logistic Regression":{},
             "AdaBoost":{
                 'learning_rate':[.1,.01,.001],
-                'n_estimators': [8,16,32,64,128,256]
+                'n_estimators': [8,16,32,64]
             },
             "KNN":{
                 'n_neighbors':[5,7,9,11],
@@ -101,7 +106,7 @@ class ModelTrainer:
 
 
             # Track best model with train data with MLFLOW
-            self.track_mlflow(best_model, classification_train_metric)
+            self.track_mlflow(best_model, classification_train_metric, best_model_name)
 
 
             logging.info("Predicting on test data with the best model")
@@ -111,7 +116,7 @@ class ModelTrainer:
             classification_test_metric: ClassificationMetricArtifact = get_classification_report(y_true=y_test, y_pred=y_test_pred)
 
             # Track best model with test data with MLFLO
-            self.track_mlflow(best_model, classification_test_metric)
+            self.track_mlflow(best_model, classification_test_metric, best_model_name)
 
             preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
             model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
@@ -120,6 +125,9 @@ class ModelTrainer:
 
             network_model = NetworkModel(model=best_model, preprocessor=preprocessor)
             save_object(file_path=self.model_trainer_config.trained_model_file_path, obj=network_model)
+
+            # Save final model in final_models location
+            save_object("final_models/model.pkl", obj=best_model)
 
             # Model trainer artifact
             model_trainer_artifact = ModelTrainerArtifact(
