@@ -15,6 +15,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
+import mlflow
+
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig, data_transformation_artifact: DataTransformationArtifact):
@@ -23,6 +25,21 @@ class ModelTrainer:
             self.data_transformation_artifact = data_transformation_artifact
         except Exception as e:
             raise NetworkSecurityException(e, sys)
+        
+    
+    def track_mlflow(self, best_model, classification_metric: ClassificationMetricArtifact):
+        
+        with mlflow.start_run():
+            f1_score = classification_metric.f1_score
+            precision_score = classification_metric.precision_score
+            recall_score = classification_metric.recall_score
+
+            mlflow.log_metric("f1_score", f1_score)
+            mlflow.log_metric("precision_score", precision_score)
+            mlflow.log_metric("recall_score", recall_score)
+
+            mlflow.sklearn.log_model(best_model, "model")
+
         
     def train_model(self, X_train, y_train, X_test, y_test):
         try:
@@ -47,9 +64,9 @@ class ModelTrainer:
                 'n_estimators': [8,16,32,128,256]
             },
             "Gradient Boosting":{
-                # 'loss':['log_loss', 'exponential'],
+                'loss':['log_loss', 'exponential'],
                 'learning_rate':[.1,.01,.05,.001],
-                'subsample':[0.6,0.7,0.75,0.85,0.9],
+                # 'subsample':[0.6,0.7,0.75,0.85,0.9],
                 # 'criterion':['squared_error', 'friedman_mse'],
                 # 'max_features':['auto','sqrt','log2'],
                 'n_estimators': [8,16,32,64,128,256]
@@ -61,7 +78,7 @@ class ModelTrainer:
             },
             "KNN":{
                 'n_neighbors':[5,7,9,11],
-                'weights':['uniform','distance'],
+                # 'weights':['uniform','distance'],
                 # 'algorithm':['auto','ball_tree','kd_tree','brute']
             }
         }
@@ -82,11 +99,19 @@ class ModelTrainer:
             logging.info("Getting the classification report for Training Data")
             classification_train_metric: ClassificationMetricArtifact = get_classification_report(y_true=y_train, y_pred=y_train_pred)
 
+
+            # Track best model with train data with MLFLOW
+            self.track_mlflow(best_model, classification_train_metric)
+
+
             logging.info("Predicting on test data with the best model")
             y_test_pred = best_model.predict(X_test)
 
             logging.info("Getting the classification report for Test Data")
             classification_test_metric: ClassificationMetricArtifact = get_classification_report(y_true=y_test, y_pred=y_test_pred)
+
+            # Track best model with test data with MLFLO
+            self.track_mlflow(best_model, classification_test_metric)
 
             preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
             model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
